@@ -58,6 +58,9 @@ const mouse = {
 // speed = acceleration * time
 
 const player = {
+    camOffset: 0,
+    tick: 0,
+    walking: false,
     x: 0,
     y: 2,
     z: 0,
@@ -70,6 +73,7 @@ const player = {
         friction: 0.84,
         gravity: 0.006,
         thickness: 0.2,
+        height: 2,
     },
 };
 
@@ -200,21 +204,31 @@ function loop() {
 
     // Movement
 
+    player.walking = false;
+
     if(keypressed.has("KeyW")) {
         player.vx -= Math.sin(camera.rotation.y) * player.settings.acceleration;
         player.vz -= Math.cos(camera.rotation.y) * player.settings.acceleration;
+        player.walking = true;
     };
     if(keypressed.has("KeyA")) {
         player.vx -= Math.cos(camera.rotation.y) * player.settings.acceleration;
         player.vz += Math.sin(camera.rotation.y) * player.settings.acceleration;
+        player.walking = true;
     };
     if(keypressed.has("KeyS")) {
         player.vx += Math.sin(camera.rotation.y) * player.settings.acceleration;
         player.vz += Math.cos(camera.rotation.y) * player.settings.acceleration;
+        player.walking = true;
     };
     if(keypressed.has("KeyD")) {
         player.vx += Math.cos(camera.rotation.y) * player.settings.acceleration;
         player.vz -= Math.sin(camera.rotation.y) * player.settings.acceleration;
+        player.walking = true;
+    };
+
+    if(player.inAir) {
+        player.walking = false;
     };
 
     player.vx *= player.settings.friction;
@@ -230,11 +244,15 @@ function loop() {
         player.vx = 0;
     };
 
+    player.inAir = true;
     player.y += player.vy;
     if(collisionDetection()) {
         let holdJump = -Math.abs(player.vy) == player.vy;
         player.y -= player.vy;
         player.vy = 0;
+        if(holdJump) {
+            player.inAir = false;
+        };
         if(keypressed.has("Space") && holdJump) {
             player.vy = 0.12;
         };
@@ -256,7 +274,15 @@ function loop() {
 
     // Position
 
-    camera.position.set(player.x, player.y + 1.8, player.z);
+    if(player.walking) {
+        player.camOffset = Math.sin(player.tick * (player.settings.acceleration * 10)) * 0.06;
+        player.tick++;
+    } else {
+        player.tick = 0;
+        player.camOffset += (0 - player.camOffset) / 5;
+    };
+
+    camera.position.set(player.x, player.y + (player.settings.height - 0.2) + player.camOffset, player.z);
     document.getElementById("cords").innerText = "X: " + Math.floor(player.x) + ", Y: " + Math.floor(player.y) + ", Z: " + Math.floor(player.z) + "\n FPS: " + fps;
 
     if(player.y < -50) {
@@ -268,12 +294,18 @@ function loop() {
 
     // Other
 
-    if(keypressed.has("KeyR")) {
-        player.settings.acceleration = 0.04;
-        screen.fov = 80;
+    if(keypressed.has("ShiftLeft")) {
+        player.settings.height = 1.8;
+        player.settings.acceleration = 0.007;
     } else {
-        player.settings.acceleration = 0.02;
-        screen.fov = 70;
+        player.settings.height = 2;
+        if(keypressed.has("KeyR")) {
+            player.settings.acceleration = 0.04;
+            screen.fov = 80;
+        } else {
+            player.settings.acceleration = 0.02;
+            screen.fov = 70;
+        };
     };
 
     // Render
@@ -284,7 +316,7 @@ function loop() {
 
 function collisionDetection() {
     let touching = false;
-    for(let index = 0; index < 2; index += 0.1) {
+    for(let index = 0; index < player.settings.height; index += 0.1) {
         for(let i = 0; i < (objects.index + 1); i++) {
             if(player.y + index + 0.1 < objects.y[i] + (objects.height[i] / 2) && player.y + index + 0.1 > objects.y[i] - (objects.height[i] / 2)) {
                 if(player.x > objects.x[i] - (objects.width[i] / 2) - player.settings.thickness && player.x < objects.x[i] + (objects.width[i] / 2) + player.settings.thickness) {
